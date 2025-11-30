@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 @Getter
 @Entity
 public class Task extends AuditableAbstractAggregateRoot<Task> {
+
     @NonNull
     private String title;
 
@@ -46,9 +47,14 @@ public class Task extends AuditableAbstractAggregateRoot<Task> {
     @Column(nullable = false)
     private Long timePassed = 0L;
 
+    @Setter
+    @Column(nullable = true)
+    private OffsetDateTime lastAlertSent;
+
     public Task() {
         this.status = TaskStatus.IN_PROGRESS;
         this.timesRearranged = 0;
+        this.lastAlertSent = null;
     }
 
     public Task(CreateTaskCommand command) {
