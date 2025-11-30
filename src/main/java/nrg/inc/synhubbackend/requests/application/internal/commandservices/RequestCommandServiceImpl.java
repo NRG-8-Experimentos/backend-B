@@ -1,5 +1,7 @@
 package nrg.inc.synhubbackend.requests.application.internal.commandservices;
 
+import nrg.inc.synhubbackend.Notification.domain.model.commands.CreateNotificationCommand;
+import nrg.inc.synhubbackend.Notification.domain.model.services.NotificationCommandService;
 import nrg.inc.synhubbackend.requests.domain.model.aggregates.Request;
 import nrg.inc.synhubbackend.requests.domain.model.commands.CreateRequestCommand;
 import nrg.inc.synhubbackend.requests.domain.model.commands.DeleteAllRequestsByTaskIdCommand;
@@ -19,12 +21,15 @@ public class RequestCommandServiceImpl implements RequestCommandService {
 
     private final RequestRepository requestRepository;
     private final TasksContextFacade tasksContextFacade;
+    private final NotificationCommandService notificationCommandService; // [NUEVO CAMPO]
 
     public RequestCommandServiceImpl(
             RequestRepository requestRepository,
-            TasksContextFacade tasksContextFacade) {
+            TasksContextFacade tasksContextFacade,
+            NotificationCommandService notificationCommandService) { // [NUEVO PARÁMETRO]
         this.requestRepository = requestRepository;
         this.tasksContextFacade = tasksContextFacade;
+        this.notificationCommandService = notificationCommandService; // [ASIGNACIÓN]
     }
 
     @Override
@@ -58,6 +63,29 @@ public class RequestCommandServiceImpl implements RequestCommandService {
 
         try {
             var updatedRequest = this.requestRepository.save(requestToUpdate);
+
+            // [LÓGICA DE NOTIFICACIÓN INTEGRADA]
+            var task = updatedRequest.getTask();
+            var member = task.getMember(); // Obtenemos el Miembro de la Tarea
+
+            if (member != null) {
+                Long memberId = member.getId();
+                String requestType = updatedRequest.getRequestType(); // Tipo de Request
+                String status = command.requestStatus().toUpperCase();
+                String taskTitle = task.getTitle();
+
+                String message = String.format(
+                        "Su solicitud de %s para la tarea '%s' ha sido %s.",
+                        requestType,
+                        taskTitle,
+                        status
+                );
+
+                var notificationCommand = new CreateNotificationCommand(memberId, message, task.getId());
+                this.notificationCommandService.handle(notificationCommand);
+            }
+            // [FIN LÓGICA DE NOTIFICACIÓN INTEGRADA]
+
             return Optional.of(updatedRequest);
         } catch (Exception e) {
             throw new IllegalArgumentException("Error while updating request: " + e.getMessage());
